@@ -18,8 +18,8 @@ def load_and_save_dataset():
     except Exception as e:
         print(f"Error loading 'disaster_tweets': {e}")
         # Fallback to a known valid repository if the exact string fails
-        print("Falling back to 'Bingsu/disaster_tweets'...")
-        dataset = load_dataset("Bingsu/disaster_tweets")
+        print("Falling back to 'ttxy/tweet_disaster'...")
+        dataset = load_dataset("ttxy/tweet_disaster")
 
     # Ensure the target directory exists
     os.makedirs(RAW_DATA_DIR, exist_ok=True)
@@ -38,7 +38,7 @@ def load_and_save_dataset():
         # 3. Saving locally as CSV
         save_path = os.path.join(RAW_DATA_DIR, f"{split_name}.csv")
         split_data.to_csv(save_path, index=False)
-        print(f"✅ Saved {split_name} data to -> {save_path}")
+        print(f"Saved {split_name} data to -> {save_path}")
 
 if __name__ == "__main__":
     load_and_save_dataset()

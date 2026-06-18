@@ -118,8 +118,8 @@ def preprocess_dataset():
     train_df.to_csv(train_path, index=False)
     val_df.to_csv(val_path, index=False)
     
-    print(f"✅ Saved train split ({len(train_df)} rows) to {train_path}")
-    print(f"✅ Saved val split ({len(val_df)} rows) to {val_path}")
+    print(f"Saved train split ({len(train_df)} rows) to {train_path}")
+    print(f"Saved val split ({len(val_df)} rows) to {val_path}")
 
 if __name__ == "__main__":
     preprocess_dataset()

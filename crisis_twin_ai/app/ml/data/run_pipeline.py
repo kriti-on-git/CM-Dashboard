@@ -12,20 +12,20 @@ from app.ml.data.preprocess import preprocess_dataset
 
 def main():
     print("=" * 50)
-    print("🚀 Starting Crisis ML Dataset Pipeline")
+    print("Starting Crisis ML Dataset Pipeline")
     print("=" * 50)
     
     try:
-        print("\n⏳ Downloading dataset...")
+        print("\nDownloading dataset...")
         load_and_save_dataset()
         
-        print("\n⚙️ Preprocessing dataset...")
+        print("\nPreprocessing dataset...")
         preprocess_dataset()
         
-        print("\n✅ Done! The dataset is ready for training.")
+        print("\nDone! The dataset is ready for training.")
         
     except Exception as e:
-        print(f"\n❌ Pipeline failed with an unexpected error: {e}")
+        print(f"\nPipeline failed with an unexpected error: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
