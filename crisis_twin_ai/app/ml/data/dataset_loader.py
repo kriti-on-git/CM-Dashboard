@@ -18,8 +18,8 @@ def load_and_save_dataset():
     except Exception as e:
         print(f"Error loading 'disaster_tweets': {e}")
         # Fallback to a known valid repository if the exact string fails
-        print("Falling back to 'vabatina/disaster-tweets'...")
-        dataset = load_dataset("vabatina/disaster-tweets")
+        print("Falling back to 'Bingsu/disaster_tweets'...")
+        dataset = load_dataset("Bingsu/disaster_tweets")
 
     # Ensure the target directory exists
     os.makedirs(RAW_DATA_DIR, exist_ok=True)
