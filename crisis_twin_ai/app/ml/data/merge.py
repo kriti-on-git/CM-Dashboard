@@ -35,7 +35,7 @@ def merge_datasets(datasets: list) -> pd.DataFrame:
     
     # 4. Print statistics
     print("\n" + "="*40)
-    print("📊 FINAL MERGED DATASET STATISTICS")
+    print("FINAL MERGED DATASET STATISTICS")
     print("="*40)
     print(f"Total Size: {final_size} records")
     print(f"Duplicates Removed: {duplicates_removed}")
