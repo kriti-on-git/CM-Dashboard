@@ -10,7 +10,7 @@ if project_root not in sys.path:
 from app.ml.data.dataset_loader import load_multiple_datasets
 from app.ml.data.normalize import normalize_dataset
 from app.ml.data.merge import merge_datasets
-from app.ml.data.vectorize import vectorize_text
+from app.ml.data.bert_vectorize import generate_bert_embeddings
 from app.ml.data.balance import apply_smote_balancing
 
 def main():
@@ -52,10 +52,10 @@ def main():
         print("\n[3/5] Merging normalized datasets into a single unified source...")
         merged_df = merge_datasets(normalized_datasets)
         
-        # Step 4: Vectorize the merged text
-        print("\n[4/5] Vectorizing text data (TF-IDF)...")
-        vectorize_text()
-        print("Vectorization complete. ML feature arrays generated.")
+        # Step 4: Vectorize the merged text using BERT
+        print("\n[4/5] Generating BERT embeddings...")
+        generate_bert_embeddings()
+        print("Embedding complete. Semantic feature arrays generated.")
         
         # Step 5: Balance the dataset with SMOTE
         print("\n[5/5] Applying SMOTE to perfectly balance class distribution...")
@@ -63,10 +63,11 @@ def main():
         print("SMOTE applied. Synthetic dataset generated successfully.")
         
         print("\n" + "=" * 50)
-        print("Done! One command -> fully SMOTE-balanced dataset ready.")
+        print("Done! One command -> fully SMOTE-balanced BERT semantic dataset ready.")
         print("Final Production Outputs:")
-        print("  - vectorizer.pkl")
-        print("  - X_resampled.npy")
+        print("  - X_bert.npy")
+        print("  - y.npy")
+        print("  - X_bert_resampled.npy")
         print("  - y_resampled.npy")
         print("=" * 50)
         
