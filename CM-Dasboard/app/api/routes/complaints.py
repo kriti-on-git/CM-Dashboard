@@ -16,6 +16,7 @@ from app.models.attachment import Attachment
 from app.schemas.complaint import ComplaintSubmissionResponse, CrisisCreate, CrisisUpdate
 from app.services.ml.inference import MLInferenceService
 from app.services.email.smtp import async_send_complaint_acknowledgement_email
+from app.services.storage.attachment import AttachmentService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -89,35 +90,6 @@ async def submit_complaint(
             detail="Too many files. Maximum 5 attachments allowed."
         )
 
-    # Validate attachments in-memory first before doing any database or disk work
-    for file in attachments:
-        # Ignore empty dummy uploads if any
-        if not file.filename:
-            continue
-        ext = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
-        if ext not in ['pdf', 'png', 'jpg', 'jpeg']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file extension: .{ext}. Allowed extensions: pdf, png, jpg, jpeg."
-            )
-        
-        content = await file.read()
-        if len(content) > 10 * 1024 * 1024:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File {file.filename} exceeds the 10 MB size limit."
-            )
-        
-        EICAR_SIGNATURE = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-        if EICAR_SIGNATURE in content:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Virus detected in file {file.filename}."
-            )
-        
-        # Reset file pointer for writing
-        await file.seek(0)
-
     # 2. Duplicate submission prevention within 5 minutes
     duplicate_query = select(Complaint).filter(
         Complaint.citizen_email == citizen_email,
@@ -184,46 +156,41 @@ async def submit_complaint(
         status=ComplaintStatus.OPEN
     )
 
-    UPLOAD_DIR = os.path.join("app", "static", "uploads")
-    written_files = []
-
+    uploaded_attachments = []
     try:
         db.add(db_complaint)
         await db.flush() # Populate ID
 
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-
         for file in attachments:
             if not file.filename:
                 continue
-            
-            content = await file.read()
-            unique_name = f"{uuid.uuid4().hex}_{file.filename}"
-            dest_path = os.path.join(UPLOAD_DIR, unique_name)
-            
-            # Write to disk
-            with open(dest_path, "wb") as f:
-                f.write(content)
-            written_files.append(dest_path)
-            
-            file_url = f"/static/uploads/{unique_name}"
-            db_attachment = Attachment(
+            attach_rec = await AttachmentService.validate_and_upload(
+                file=file,
                 complaint_id=db_complaint.id,
-                file_url=file_url
+                db=db
             )
-            db.add(db_attachment)
+            uploaded_attachments.append(attach_rec)
 
         await db.commit()
     except Exception as e:
         # Rollback DB transaction
         await db.rollback()
-        # Clean up files written to disk during this request
-        for path in written_files:
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception as cleanup_err:
-                logger.error(f"Failed to delete file {path} during rollback: {cleanup_err}")
+        # Clean up files uploaded during this request
+        for attach in uploaded_attachments:
+            file_url = attach.file_url
+            if file_url.startswith("/static/uploads/"):
+                local_path = os.path.join("app", file_url.lstrip("/"))
+                try:
+                    if os.path.exists(local_path):
+                        os.remove(local_path)
+                except Exception as cleanup_err:
+                    logger.error(f"Failed to delete local fallback file {local_path} during rollback: {cleanup_err}")
+            elif settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY and settings.S3_BUCKET:
+                try:
+                    key = file_url.split("/")[-1]
+                    await asyncio.to_thread(AttachmentService._delete_s3_keys, [key])
+                except Exception as s3_cleanup_err:
+                    logger.error(f"Failed to delete S3 object {file_url} during rollback: {s3_cleanup_err}")
         
         if isinstance(e, HTTPException):
             raise e

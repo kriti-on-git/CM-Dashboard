@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", "no-reply@delhi.gov.in")
 
+    # AWS S3 Storage settings
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "")
+    S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "")
+    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "")
+    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "")
+    S3_REGION: str = os.getenv("S3_REGION", "us-east-1")
+
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         # We enforce asyncpg for the database connection
