@@ -91,3 +91,24 @@ async def async_send_complaint_acknowledgement_email(
     </html>
     """
     await asyncio.to_thread(sync_send_email, email_to, subject, html_content)
+
+async def async_send_notification_email(
+    email_to: str,
+    subject: str,
+    message: str
+) -> None:
+    """
+    Async wrapping of a generic alert notification email dispatch.
+    """
+    html_content = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
+            <h2 style="color: #0b3c5d;">Delhi CMO Grievance Portal</h2>
+            <h3 style="color: #d9534f;">New Alert Notification</h3>
+            <p>{message}</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #999; text-align: center;">Government of National Capital Territory of Delhi &copy; 2026</p>
+        </body>
+    </html>
+    """
+    await asyncio.to_thread(sync_send_email, email_to, subject, html_content)
