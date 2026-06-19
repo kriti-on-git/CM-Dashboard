@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
     POSTGRES_PORT: str = os.getenv("POSTGRES_PORT", "5432")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "complaint_db")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 11520
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
@@ -20,5 +21,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 settings = Settings()

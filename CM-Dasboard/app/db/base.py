@@ -3,7 +3,11 @@
 
 from app.models.base import Base  # noqa
 from app.models.user import User  # noqa
-from app.models.incident import Incident  # noqa
-from app.models.report import Report  # noqa
-from app.models.agent import Agent  # noqa
-from app.models.assignment import Assignment  # noqa
+from app.models.complaint import Complaint  # noqa
+from app.models.complaint_update import ComplaintUpdate  # noqa
+from app.models.comment import Comment  # noqa
+from app.models.attachment import Attachment  # noqa
+from app.models.notification import Notification  # noqa
+from app.models.otp import OTP  # noqa
+from app.models.feedback import Feedback  # noqa
+from app.models.escalation import Escalation  # noqa

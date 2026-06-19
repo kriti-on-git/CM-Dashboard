@@ -1,16 +1,30 @@
-import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, Uuid
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import DateTime, Boolean
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """
+    SQLAlchemy Declarative Base class.
+    """
+    pass
 
 class BaseModel(Base):
     """
-    Abstract base model that includes UUID primary key and created_at/updated_at timestamps.
+    Abstract base model that includes an auto-incrementing integer primary key,
+    created_at/updated_at timestamps, and soft delete capability.
     """
     __abstract__ = True
-    
-    id = Column(Uuid, primary_key=True, default=uuid.uuid4, index=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

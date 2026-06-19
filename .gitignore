@@ -13,5 +13,5 @@ faiss_db/
 CM-Dasboard/app/ml/data/raw/
 CM-Dasboard/app/ml/data/processed/
 CM-Dasboard/app/ml/data/rl/
-
+PROJECT_ASSESSMENT.md
 app/ml/data/processed/*.csv

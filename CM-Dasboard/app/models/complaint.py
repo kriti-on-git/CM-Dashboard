@@ -1,28 +1,74 @@
 import enum
-from sqlalchemy import Column, Integer, String, Text, Enum, ForeignKey, DateTime
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.db.base import Base
+from typing import List, Optional
+from sqlalchemy import String, Text, Enum, ForeignKey, Integer, Float
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from .base import BaseModel
 
-class SeverityEnum(str, enum.Enum):
-    low = "low"
-    medium = "medium"
-    high = "high"
+class PriorityEnum(str, enum.Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
 
-class StatusEnum(str, enum.Enum):
-    active = "active"
-    resolved = "resolved"
+class ComplaintStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    RESOLVED = "RESOLVED"
+    REJECTED = "REJECTED"
+    ESCALATED = "ESCALATED"
 
-class Complaint(Base):
+class Complaint(BaseModel):
     __tablename__ = "complaints"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True, nullable=False)
-    description = Column(Text, nullable=True)
-    severity = Column(Enum(SeverityEnum), default=SeverityEnum.low, nullable=False)
-    location = Column(String, nullable=False)
-    status = Column(Enum(StatusEnum), default=StatusEnum.active, nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ticket_id: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
+    citizen_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    citizen_email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    citizen_phone: Mapped[Optional[str]] = mapped_column(String(15), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    district: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    
+    # Geographic location
+    lat: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    lon: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    
+    # Enums
+    priority: Mapped[PriorityEnum] = mapped_column(Enum(PriorityEnum), default=PriorityEnum.LOW, index=True, nullable=False)
+    status: Mapped[ComplaintStatus] = mapped_column(Enum(ComplaintStatus), default=ComplaintStatus.OPEN, index=True, nullable=False)
+    
+    # Assigned Officer FK
+    assigned_to: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
 
-    creator = relationship("User")
+    # Relationships
+    assigned_officer: Mapped[Optional["User"]] = relationship(
+        "User",
+        back_populates="assigned_complaints",
+        foreign_keys=[assigned_to]
+    )
+    updates: Mapped[List["ComplaintUpdate"]] = relationship(
+        "ComplaintUpdate",
+        back_populates="complaint",
+        cascade="all, delete-orphan"
+    )
+    comments: Mapped[List["Comment"]] = relationship(
+        "Comment",
+        back_populates="complaint",
+        cascade="all, delete-orphan"
+    )
+    attachments: Mapped[List["Attachment"]] = relationship(
+        "Attachment",
+        back_populates="complaint",
+        cascade="all, delete-orphan"
+    )
+    feedbacks: Mapped[List["Feedback"]] = relationship(
+        "Feedback",
+        back_populates="complaint",
+        cascade="all, delete-orphan"
+    )
+    escalations: Mapped[List["Escalation"]] = relationship(
+        "Escalation",
+        back_populates="complaint",
+        cascade="all, delete-orphan"
+    )
