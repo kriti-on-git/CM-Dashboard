@@ -4,6 +4,7 @@ from app.services.agents.classification_agent import ClassificationAgent
 from app.services.agents.severity_agent import SeverityAgent
 from app.services.agents.routing_agent import RoutingAgent
 from app.services.memory.faiss_memory import FaissMemory
+from app.services.memory.retriever import ContextRetriever
 
 class PipelineManager:
     """
@@ -16,6 +17,7 @@ class PipelineManager:
         self.severity_agent = SeverityAgent()
         self.routing_agent = RoutingAgent()
         self.memory = FaissMemory()
+        self.retriever = ContextRetriever()
 
     async def process_incident(self, text: str) -> Dict[str, Any]:
         """
@@ -30,8 +32,9 @@ class PipelineManager:
         combined_result = {"original_text": text}
         incident_id = str(uuid.uuid4())
         
-        # 0. Retrieve similar past incidents from FAISS memory
-        similar_incidents = self.memory.search_similar(text, top_k=3)
+        # 0. Retrieve similar past incidents from FAISS memory via Context Retriever
+        retriever_result = self.retriever.get_context(text, top_k=3)
+        similar_incidents = retriever_result.get("similar_cases", [])
         combined_result["similar_incidents_context"] = similar_incidents
         
         # 1. Classify the incident (passing context)
