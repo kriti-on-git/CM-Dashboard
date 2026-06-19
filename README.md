@@ -1,45 +1,47 @@
-# CrisisTwin AI 🚨
+# CM-Dashboard (Complaint Intelligence System) 🚨
 
-> A scalable, AI-powered backend system for complaint management and rapid response coordination.
+> A scalable, AI-powered backend system for civic complaint management, routing, and rapid response coordination.
 
-**CrisisTwin AI** is a robust backend system designed to manage, analyze, and coordinate responses to complaint situations. Built with modern Python technologies, it provides a secure and scalable foundation for reporting emergencies, dispatching responders, and leveraging Artificial Intelligence to automatically categorize, evaluate, and suggest remediation strategies.
+**CM-Dashboard** is a robust backend system designed to manage, analyze, and coordinate responses to civic complaints (e.g., sanitation, water supply, roads). Built with modern AI and Python technologies, it provides a powerful multi-stage pipeline utilizing PyTorch multi-label classification, FAISS-based Retrieval-Augmented Generation (RAG), and a sequential Decision Agent architecture to automatically categorize and route issues to the correct departments.
 
 ---
 
-## ✨ Features
+## ✨ Core Features
 
-- **Robust User Authentication**: Secure login and registration flows utilizing JSON Web Tokens (JWT).
-- **Complaint Reporting System**: Complete RESTful APIs for submitting, tracking, and managing real-time complaint incidents.
-- **Role-Based Users**: Architectural readiness for strict access controls (Admin, Responder, Citizen).
-- **Scalable Architecture**: Engineered with Domain-Driven Design principles, ensuring the system remains clean and modular as it grows.
-- **AI Agent-Ready Design**: Structured with abstract base agents, perfectly primed to integrate Large Language Models (LLMs) for automated complaint analysis.
+- **Multi-Label AI Classification**: Automatically tags incoming complaints with categories using a fine-tuned PyTorch `BCEWithLogitsLoss` model with dynamic threshold tuning.
+- **RAG Memory Integration**: Leverages `sentence-transformers` and `FAISS` to fetch historical context on similar complaints, ensuring routing consistency.
+- **Sequential Decision Agent**: An orchestrated agent pipeline that cross-validates ML predictions against historical consensus to output highly accurate, structured routing JSON responses.
+- **Robust Authentication & Routing**: Secure RESTful FastAPI endpoints handling both synchronous and asynchronous operations.
+- **End-to-End Evaluation**: Automated evaluation pipeline outputting ROC-AUC curves, confusion matrices, and metrics.
 
 ## 🛠️ Tech Stack
 
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) - High performance, easy to learn, fast to code.
-- **Database**: [PostgreSQL](https://www.postgresql.org/) - Powerful, open-source object-relational database.
-- **ORM**: [SQLAlchemy](https://www.sqlalchemy.org/) - The Python SQL toolkit and Object Relational Mapper.
-- **Migrations**: [Alembic](https://alembic.sqlalchemy.org/) - Lightweight database migration tool for SQLAlchemy.
-- **Language**: Python 3.10+
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) - High performance API routing.
+- **AI / ML**: [PyTorch](https://pytorch.org/), [Sentence-Transformers](https://sbert.net/), [scikit-learn](https://scikit-learn.org/)
+- **Vector Database**: [FAISS](https://github.com/facebookresearch/faiss) - Fast similarity search.
+- **Database**: [PostgreSQL](https://www.postgresql.org/) via SQLAlchemy and Alembic.
 
 ---
 
 ## 📂 Project Structure
 
 ```text
-complaint_twin_ai/
-├── app/
-│   ├── agents/         # AI analysis agents and orchestrators
-│   ├── api/            # API routers and dependency injection
-│   ├── core/           # App-wide settings and security utilities
-│   ├── crud/           # Database operations (Create, Read, Update, Delete)
-│   ├── db/             # SQLAlchemy engine, session maker, and base class
-│   ├── models/         # SQLAlchemy ORM entities
-│   ├── schemas/        # Pydantic models for validation and serialization
-│   └── services/       # Core business logic and use cases
-├── alembic/            # Database migration scripts
-├── .env.example        # Template for environment variables
-└── requirements.txt    # Python dependencies
+CM-Dashboard/
+├── CM-Dasboard/
+│   ├── app/
+│   │   ├── api/            # FastAPI routers (e.g., /complaints, /pipeline)
+│   │   ├── ml/             # PyTorch training loops, datasets, evaluation code
+│   │   ├── models/         # SQLAlchemy ORM entities
+│   │   ├── schemas/        # Pydantic models for validation
+│   │   └── services/
+│   │       ├── agents/     # Decision Agent orchestrator & modular components
+│   │       ├── memory/     # FAISS RAG and vector retrieval
+│   │       └── ml/         # ML inference loaders
+│   ├── tests/              # Pytest logic with mocked ML/FAISS
+│   └── .env.example        # Environment variables
+├── scripts/                # End-to-end execution and output generation scripts
+├── outputs/                # Evaluation metrics, JSON results, and confusion matrices
+└── logs/                   # Pipeline execution logs
 ```
 
 ## 🚀 Setup Instructions
@@ -48,17 +50,16 @@ Follow these steps to run the project locally:
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/CrisisTwin.git
-cd CrisisTwin/complaint_twin_ai
+git clone https://github.com/sarthaksinghaniya/CM-Dashboard.git
+cd CM-Dashboard
 ```
 
 **2. Create a virtual environment**
 ```bash
 python -m venv venv
-
-# On Windows:
+# Windows:
 .\venv\Scripts\activate
-# On macOS/Linux:
+# macOS/Linux:
 source venv/bin/activate
 ```
 
@@ -68,48 +69,45 @@ pip install -r requirements.txt
 ```
 
 **4. Setup Environment Variables**
-Copy the example environment file and update it with your actual database credentials and secrets.
+Copy the example environment file and update it.
 ```bash
+cd CM-Dasboard
 cp .env.example .env
 ```
 
-**5. Run Database Migrations**
-Initialize the database schema using Alembic.
-```bash
-alembic upgrade head
-```
-
-**6. Start the Server**
+**5. Start the Server**
 ```bash
 uvicorn app.main:app --reload
 ```
 
 ---
 
-## 🔐 Environment Variables
+## 🧪 Testing & Execution
 
-The project requires a `.env` file at the root of `complaint_twin_ai/`. Key variables include:
+The system is built for easy verification:
 
-- `DATABASE_URL`: The connection string for your PostgreSQL database. *(Note: Our project parses this dynamically from components like `POSTGRES_SERVER`, `POSTGRES_USER`, etc.)*
-- `SECRET_KEY`: A strong, unpredictable string used to cryptographically sign JWT tokens.
-- `ALGORITHM`: The algorithm used for token signing (e.g., `HS256`).
+**1. Run Pytests:**
+```bash
+# Set PYTHONPATH and execute pytest
+$env:PYTHONPATH="./CM-Dasboard"; python -m pytest CM-Dasboard/tests/test_pipeline.py
+```
+
+**2. Run Evaluation Artifact Generation:**
+```bash
+python scripts/generate_eval_outputs.py
+```
+*Creates `metrics.json` and PNG plots in the `outputs/` folder.*
+
+**3. Run End-to-End Mock Pipeline:**
+```bash
+python scripts/e2e_runner.py
+```
+*Traces a real complaint through the ML and RAG pipeline, saving the output to `outputs/results.json`.*
 
 ## 📚 API Documentation
 
-Once the server is running, FastAPI automatically generates interactive API documentation based on OpenAPI standards. You can access it by navigating to:
-
+Once the FastAPI server is running, you can access the Swagger documentation here:
 - **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
----
-
-## 🔮 Future Improvements
-
-As the project evolves, the following features are mapped for the roadmap:
-
-- **AI Complaint Analysis Agents**: Integration with Large Language Models (LLMs) to automatically parse descriptions, assess severity, and extract key entities from incoming reports.
-- **Real-Time Alerts**: WebSocket integration for instant push notifications and alerts to active responders.
-- **External API Integrations**: Hooking into weather data, traffic APIs, and emergency broadcast systems for enriched complaint context.
 
 ## 📄 License
 
