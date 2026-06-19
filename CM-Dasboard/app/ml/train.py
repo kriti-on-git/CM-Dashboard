@@ -65,25 +65,18 @@ class TrainPipeline:
         return model
         
     def evaluate(self, model, X_test, y_test, name: str = "Model", label_encoder=None):
-        """Runs predictions and prints evaluation metrics including accuracy, F1, and confusion matrix."""
+        """Runs predictions and delegates advanced metrics to ModelEvaluator."""
+        from app.ml.evaluate import ModelEvaluator
+        evaluator = ModelEvaluator(output_dir="outputs")
+        
         preds = model.predict(X_test)
         
-        acc = accuracy_score(y_test, preds)
-        f1 = f1_score(y_test, preds, average='weighted')
-        
-        logger.info(f"\n{'='*40}\n{name.upper()} EVALUATION\n{'='*40}")
-        logger.info(f"Accuracy: {acc:.4f}")
-        logger.info(f"F1 Score (Weighted): {f1:.4f}\n")
-        
-        # Determine target names if encoder is provided
-        target_names = label_encoder.classes_ if label_encoder else None
-        
-        logger.info("Classification Report:")
-        logger.info("\n" + classification_report(y_test, preds, target_names=target_names))
-        
-        logger.info("Confusion Matrix:")
-        logger.info("\n" + str(confusion_matrix(y_test, preds)))
-        logger.info("="*40)
+        # Check if the model supports predict_proba for ROC-AUC
+        y_prob = None
+        if hasattr(model, "predict_proba"):
+            y_prob = model.predict_proba(X_test)
+            
+        evaluator.evaluate(y_test, preds, model_name=name, label_encoder=label_encoder, y_prob=y_prob)
         
     def run(self):
         """Executes the full pipeline sequentially."""
