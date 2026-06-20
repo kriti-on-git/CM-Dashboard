@@ -76,77 +76,55 @@ else:
 complaints_router = APIRouter(prefix=f"{settings.API_V1_STR}/complaints", tags=["Complaints"])
 
 # ==========================================
-# 1. CLASSIFY COMPLAINT ROUTE (WITH LLM FALLBACK)
+# 1. CLASSIFY COMPLAINT ROUTE (FIXED DI INJECTION)
 # ==========================================
 @complaints_router.post("/classify", response_model=ClassificationResponse)
 async def classify_complaint(
     request: ComplaintRequest,
-    service = Depends(lambda: None) # Keeps dependency footprint intact without breaking signatures
+    service: MLInferenceService = Depends(get_classifier_service) # Fixed: Kept original DI intact
 ):
     """
-    Classifies complaints using local services. Automatically falls back to
-    Gemini structured parsing to eliminate production crashes.
+    Classifies complaints using the local MLInferenceService pipeline. 
+    If the local model fails, it automatically runs the Gemini fallback.
     """
     try:
-        # Fallback instantly if the internal/local service instance is missing
-        if not service:
-            raise ValueError("Local MLInferenceService missing or uninitialized.")
+        if service is None:
+            raise ValueError("Local MLInferenceService dependency returned None.")
             
+        # Execute the primary local service prediction model in a safe threadpool
         res = await asyncio.to_thread(service.predict, request.text)
         return ClassificationResponse(
             labels=res.get("category_pred", []), 
             confidence=res.get("confidence_score", 0.0)
         )
+        
     except Exception as local_exception:
-        logger.warning(f"Local classification failed ({str(local_exception)}). Triggering production Gemini fallback...")
+        logger.warning(
+            f"[CLASSIFY_FALLBACK] Local service encountered an issue ({str(local_exception)}). "
+            "Routing request to live Gemini fallback engine..."
+        )
         
         if not ai_client:
-            raise HTTPException(status_code=500, detail="GenAI Client unavailable and local service failed.")
+            raise HTTPException(
+                status_code=500, 
+                detail="Local classification failed and live Gemini GenAI Client is offline."
+            )
 
         try:
-            # Force Gemini to return a clean, validated JSON schema matching your app
+            # Enforce an exact structural JSON response format matching your schema
             classification_schema = types.Schema(
-    type=types.Type.OBJECT,
-    properties={
-        "category": types.Schema(
-            type=types.Type.STRING, 
-            description="The precise department responsible for resolving the citizen complaint.",
-            # Elite, exhaustive, clean department list for CM Dashboard
-            enum=[
-                "Water & Sewage", 
-                "Power & Energy", 
-                "Sanitation & Waste", 
-                "Roads & Infrastructure", 
-                "Public Safety & Security",
-                "Healthcare & Medical",
-                "Public Transit & Traffic",
-                "Education & Schools",
-                "Social Welfare & Pensions",
-                "Governance & Corruption"
-            ]
-        ),
-        "confidence": types.Schema(
-            type=types.Type.NUMBER, 
-            description="Float confidence metric score from 0.0 to 1.0 based on context match."
-        ),
-        "urgency_score": types.Schema(
-            type=types.Type.STRING,
-            description="Criticality tier for CM intervention metrics.",
-            enum=["Low", "Medium", "High", "Critical"]
-        ),
-        "executive_summary": types.Schema(
-            type=types.Type.STRING,
-            description="A strictly 1-sentence, jargon-free summary of the core grievance for quick reading."
-        )
-    },
-    required=["category", "confidence", "urgency_score", "executive_summary"]
-)
-
+                type=types.Type.OBJECT,
+                properties={
+                    "category": types.Schema(type=types.Type.STRING, description="Department like Water, Power, Sanitation, Roads, Security"),
+                    "confidence": types.Schema(type=types.Type.NUMBER, description="Confidence score from 0.0 to 1.0")
+                },
+                required=["category", "confidence"]
+            )
 
             response = await asyncio.to_thread(
                 ai_client.models.generate_content,
                 model='gemini-2.5-flash',
-                contents=f"Classify the department for this citizen issue:\n\"{request.text}\"",
+                contents=f"Classify the target department for this citizen issue text:\n\"{request.text}\"",
                 config=types.GenerateContentConfig(
                     system_instruction="You are a routing classification system for city operations. Return JSON only.",
                     response_mime_type="application/json",
@@ -163,36 +141,37 @@ async def classify_complaint(
             )
             
         except Exception as fallback_err:
-            logger.error(f"Critical fallback failure: {str(fallback_err)}", exc_info=True)
-            raise HTTPException(status_code=500, detail="All classification modules failed.")
- 
+            logger.error(f"[CRITICAL] Both local classifier and Gemini fallback failed: {str(fallback_err)}", exc_info=True)
+            raise HTTPException(status_code=500, detail="All classification engine variations failed.")
+
+
 # ==========================================
-# 2. COLD-START IMMUNE RAG QUERY ROUTE
+# 2. COLD-START IMMUNE RAG QUERY ROUTE (FIXED DI INJECTION)
 # ==========================================
 @complaints_router.post("/rag/query", response_model=RAGResponse)
 async def query_rag(
     request: QueryRequest,
-    service = Depends(lambda: None) # Keeps your injection signatures safe
+    service: ContextRetriever = Depends(get_rag_service) # Fixed: Re-enabled production DI engine
 ):
     """
-    RAG Route. If the database/FAISS store is empty, it bypasses cold-start limits 
-    by grounding the issue with a Zero-Shot fallback system.
+    RAG Route. Utilizes your local ContextRetriever. If the index is blank or 
+    unreachable, it defaults to zero-shot generation to prevent server errors.
     """
     try:
         contexts = []
         
-        # If your vector index service is alive, attempt retrieval safely
         if service:
             try:
                 res = await asyncio.to_thread(service.get_context, request.query)
-                contexts = [c.get("metadata", {}).get("text", "") for c in res.get("similar_cases", []) if c.get("metadata")]
+                if res and "similar_cases" in res:
+                    contexts = [c.get("metadata", {}).get("text", "") for c in res.get("similar_cases", []) if c.get("metadata")]
             except Exception as retrieval_err:
-                logger.warning(f"Active vector index lookup failed: {str(retrieval_err)}. Proceeding with zero context.")
+                logger.warning(f"[RAG_RETRIEVAL_WARN] Local vector store lookup skipped: {str(retrieval_err)}")
 
-         # FIX FOR EMPTY OUTPUTS: Provide a safe operational baseline if the vector store is empty
+        # Handle empty database or cold-start scenarios gracefully
         if not contexts:
             context_str = "No specific system procedures found in local FAISS memory store database (Index Cold Start State)."
-            logger.info("Cold start vector state encountered; using clean zero-shot generation.")
+            logger.info("[RAG_ENGINE] Empty context state encountered. Shifting to standard grounding baseline.")
         else:
             context_str = "\n".join([f"- {c}" for c in contexts])
 
@@ -200,13 +179,14 @@ async def query_rag(
             "You are an expert AI operator managing the City & Facility Operations Dashboard.\n"
             "Your job is to answer incoming queries or process citizen complaints using ONLY the factual context provided below.\n"
             "If the provided context does not contain enough information, state clearly that the database is currently "
-            "empty or missing this configuration, then provide a helpful, generalized resolution process for the citizen.\n"
+            "empty, then provide a helpful, generalized resolution process for the citizen.\n"
             "Do not invent system variables or operational histories.\n\n"
             f"=== SYSTEM CONTEXT AND SOPS ===\n{context_str}"
         )
 
         if not ai_client:
-            raise HTTPException(status_code=500, detail="Gemini Engine API integration is offline.")
+            raise HTTPException(status_code=500, detail="Gemini Engine API client is offline.")
+
         response = await asyncio.to_thread(
             ai_client.models.generate_content,
             model='gemini-2.5-flash',
@@ -224,34 +204,34 @@ async def query_rag(
         )
 
     except Exception as e:
-        logger.error(f"RAG execution failure: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error during RAG retrieval and generation")
-    
+        logger.error(f"[RAG_CRASH] Execution failure across processing pipelines: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error during RAG retrieval and generation execution phase.")
+
 
 # ==========================================
-# 3. AGENT DECIDE ROUTE
+# 3. AGENT DECIDE ROUTE (FIXED DI INJECTION)
 # ==========================================
 @complaints_router.post("/agent/decide", response_model=AgentDecisionResponse)
 async def agent_decide(
     request: ComplaintRequest,
-    rag_service = Depends(lambda: None),
-    memory_service = Depends(lambda: None),
-    agent_service = Depends(lambda: None),
-    classifier_service = Depends(lambda: None)
+    rag_service: ContextRetriever = Depends(get_rag_service),          # Fixed DI
+    memory_service: FaissMemory = Depends(get_memory_service),         # Fixed DI
+    agent_service: DecisionAgent = Depends(get_agent_service),         # Fixed DI
+    classifier_service: MLInferenceService = Depends(get_classifier_service) # Fixed DI
 ):
     """
-    Combines classification, historical memory, and RAG contexts to determine 
+    Combines local classification, historical memory, and RAG contexts to determine 
     officer assignment instructions.
     """
     try:
-        # Step A: Run classification with a reliable fallback
+        # Step A: Run local classification with safe fallback handling
         try:
             class_res = await classify_complaint(request, service=classifier_service)
             assigned_labels = class_res.labels
         except Exception:
             assigned_labels = ["General Operations"]
 
-        # Step B: Search past context paths
+        # Step B: Secure historical context paths
         contexts = []
         if rag_service:
             try:
@@ -260,7 +240,7 @@ async def agent_decide(
             except Exception:
                 pass
 
-        # Step C: Generate decision with standard fallback parameters if agent service fails
+        # Step C: Generate decision via local agent service
         if agent_service:
             try:
                 decision_payload = await asyncio.to_thread(
@@ -276,7 +256,7 @@ async def agent_decide(
             except Exception:
                 pass
 
-         # Universal system backup decision logic to keep operations running smoothly
+        # Safe programmatic backup if agent execution layer errors out
         target_dept = assigned_labels[0] if assigned_labels else "General Desk"
         return AgentDecisionResponse(
             decision=f"Route ticket automatically to {target_dept} Central Department Handler Pool",
@@ -284,9 +264,8 @@ async def agent_decide(
         )
 
     except Exception as e:
-        logger.error(f"Agent decision pipeline exception: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error computing agent decision")
-    
+        logger.error(f"[AGENT_DECIDE_CRASH] Primary orchestration pipeline failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error computing automated agent decision matrix rules.")
     
 # ==========================================
 # 4. MEMORY SEARCH ROUTE (PRODUCTION FIX)
