@@ -110,5 +110,37 @@ Once the FastAPI server is running, you can access the Swagger documentation her
 - **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## 📄 License
+You are a senior systems engineer.
+
+Build a deterministic, production-grade complaint processing ENGINE CORE.
+
+Requirements:
+
+* Implement a state machine:
+  SUBMITTED → PROCESSING → RESOLVED | FAILED | FAILED_FINAL
+* Add retry system:
+
+  * retry_count (max 3)
+  * exponential backoff
+* Central pipeline executor:
+
+  * idempotent
+  * failure-safe
+  * logs every transition
+* Ensure:
+
+  * no race conditions
+  * thread-safe execution
+  * no duplicate processing
+
+Output:
+
+* pipeline module
+* state transition logic
+* retry handler
+* logging hooks
+
+Do NOT include API routes.
+Focus ONLY on core engine logic.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
