@@ -1,6 +1,7 @@
 import enum
+from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import String, Text, Enum, ForeignKey, Integer, Float
+from sqlalchemy import String, Text, Enum, ForeignKey, Integer, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import BaseModel
 
@@ -41,6 +42,10 @@ class Complaint(BaseModel):
     
     # Assigned Officer FK
     assigned_to: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+
+    # Retry Tracking
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     assigned_officer: Mapped[Optional["User"]] = relationship(

@@ -9,12 +9,14 @@ from app.models.complaint_update import ComplaintUpdate
 from app.services.storage.attachment import AttachmentService
 from app.schemas.complaint import Complaint as ComplaintSchema
 
+from app.models.user import User
+
 router = APIRouter()
 
 @router.get("/complaints", response_model=List[ComplaintSchema])
 async def get_assigned_complaints(
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role(Officer))
+    current_user: User = Depends(require_role(Officer))
 ):
     query = select(Complaint).filter(Complaint.assigned_to == current_user.id)
     result = await db.execute(query)
@@ -26,7 +28,7 @@ async def update_complaint_status(
     status_update: str = Form(...),
     note: str = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role(Officer))
+    current_user: User = Depends(require_role(Officer))
 ):
     try:
         new_status = ComplaintStatus(status_update.upper())
@@ -61,7 +63,7 @@ async def upload_proof(
     ticket_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role(Officer))
+    current_user: User = Depends(require_role(Officer))
 ):
     query = select(Complaint).filter(
         Complaint.ticket_id == ticket_id,

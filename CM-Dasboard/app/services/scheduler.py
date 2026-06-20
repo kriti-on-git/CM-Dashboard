@@ -38,25 +38,33 @@ async def scheduled_retry_pipeline_job():
     
     async with AsyncSessionLocal() as session:
         try:
-            # Find complaints that have been SUBMITTED for more than 2 minutes
+            # Find complaints that have been SUBMITTED for more than 2 minutes and have retry_count < 3
             two_mins_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=2)
             query = select(Complaint).filter(
                 Complaint.status == ComplaintStatus.SUBMITTED,
-                Complaint.created_at < two_mins_ago
+                Complaint.created_at < two_mins_ago,
+                Complaint.retry_count < 3
             )
             result = await session.execute(query)
             stuck_complaints = result.scalars().all()
             
             if stuck_complaints:
                 logger.info(f"Found {len(stuck_complaints)} stuck complaints to retry.")
+                # Update retry trackers first
                 for c in stuck_complaints:
-                    logger.info(f"Retrying pipeline for ticket: {c.ticket_id}")
+                    c.retry_count += 1
+                    c.last_retry_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                await session.commit()
+
+                # Execute pipeline sequentially for the stuck complaints
+                for c in stuck_complaints:
+                    logger.info(f"[Ticket {c.ticket_id}] Retrying pipeline (Attempt {c.retry_count}/3)")
                     try:
                         await execute_pipeline_task(c.ticket_id)
                     except Exception as e:
-                        logger.error(f"Failed to retry pipeline for {c.ticket_id}: {e}", exc_info=True)
+                        logger.error(f"[Ticket {c.ticket_id}] Failed to retry pipeline: {e}", exc_info=True)
             else:
-                logger.info("No stuck complaints found.")
+                logger.info("No stuck complaints found requiring retry.")
         except Exception as e:
             logger.error(f"Error during scheduled retry pipeline job: {e}", exc_info=True)
             await session.rollback()
@@ -68,12 +76,14 @@ def start_scheduler():
             trigger=IntervalTrigger(minutes=5),
             id="escalation_job",
             replace_existing=True,
+            max_instances=1
         )
         scheduler.add_job(
             scheduled_retry_pipeline_job,
             trigger=IntervalTrigger(minutes=2),
             id="retry_pipeline_job",
             replace_existing=True,
+            max_instances=1
         )
         scheduler.start()
         logger.info("APScheduler started successfully.")
