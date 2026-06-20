@@ -249,6 +249,22 @@ async def submit_complaint(
             action_url=f"/complaints/{ticket_id}"
         )
 
+    # 6.6 Async FAISS Memory Ingestion
+    def sync_add_to_memory(text: str, metadata: dict):
+        from app.main import get_memory_service
+        try:
+            get_memory_service().add_memory(text=text, metadata=metadata)
+            logger.info(f"Ingested ticket {metadata['ticket_id']} into FAISS brain.")
+        except Exception as e:
+            logger.error(f"FAISS ingestion failed for {metadata['ticket_id']}: {e}", exc_info=True)
+
+    metadata = {
+        "ticket_id": ticket_id,
+        "labels": [final_category],
+        "decision": "Routed" if assigned_to else "Pending"
+    }
+    background_tasks.add_task(sync_add_to_memory, description, metadata)
+
     # 7. Response
     return ComplaintSubmissionResponse(
         ticket_id=ticket_id,

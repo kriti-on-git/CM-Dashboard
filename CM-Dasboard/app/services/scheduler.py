@@ -8,9 +8,17 @@ from app.db.session import AsyncSessionLocal
 from app.api.routes.escalation import run_escalation_check
 from app.models.complaint import Complaint, ComplaintStatus
 
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler()
+sync_db_url = settings.SQLALCHEMY_DATABASE_URI.replace("+asyncpg", "")
+jobstores = {
+    'default': SQLAlchemyJobStore(url=sync_db_url)
+}
+
+scheduler = AsyncIOScheduler(jobstores=jobstores)
 
 async def scheduled_escalation_job():
     logger.info("Starting scheduled escalation job...")

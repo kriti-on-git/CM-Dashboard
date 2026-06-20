@@ -42,6 +42,27 @@ class FaissMemory:
         }
         self._current_id += 1
         return True
+
+    def save_memory(self, index_path="memory.faiss", meta_path="meta.json"):
+        """Saves the FAISS index and metadata to disk."""
+        import json
+        faiss.write_index(self.index, index_path)
+        with open(meta_path, "w") as f:
+            json.dump(self.metadata_store, f)
+        logger.info(f"Saved FAISS memory to {index_path} and {meta_path}")
+
+    def load_memory(self, index_path="memory.faiss", meta_path="meta.json"):
+        """Loads the FAISS index and metadata from disk if they exist."""
+        import os, json
+        if os.path.exists(index_path) and os.path.exists(meta_path):
+            self.index = faiss.read_index(index_path)
+            with open(meta_path, "r") as f:
+                store_str = json.load(f)
+                self.metadata_store = {int(k): v for k, v in store_str.items()}
+            self._current_id = max(self.metadata_store.keys(), default=-1) + 1
+            logger.info(f"Loaded FAISS memory from {index_path} and {meta_path}")
+        else:
+            logger.info("No existing FAISS memory found. Starting fresh.")
         
     def apply_rl_reward(self, text: str, reward: float, metadata: Dict[str, Any] = None):
         """

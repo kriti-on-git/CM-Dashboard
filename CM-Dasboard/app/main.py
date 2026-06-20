@@ -65,7 +65,7 @@ async def classify_complaint(
     service: MLInferenceService = Depends(get_classifier_service)
 ):
     try:
-        res = service.predict(request.text)
+        res = await asyncio.to_thread(service.predict, request.text)
         return ClassificationResponse(labels=res.get("category_pred", []), confidence=res.get("confidence_score", 0.0))
     except Exception as e:
         logger.error(f"Classification failure: {str(e)}", exc_info=True)
@@ -78,7 +78,7 @@ async def query_rag(
 ):
     try:
         # get_context returns a dict with 'similar_cases'
-        res = service.get_context(request.query)
+        res = await asyncio.to_thread(service.get_context, request.query)
         contexts = [c.get("metadata", {}).get("text", "") for c in res.get("similar_cases", [])]
         return RAGResponse(context=contexts)
     except Exception as e:
@@ -94,8 +94,8 @@ async def agent_decide(
     classifier_service: MLInferenceService = Depends(get_classifier_service)
 ):
     try:
-        ml_res = classifier_service.predict(request.text)
-        rag_result = rag_service.get_context(request.text)
+        ml_res = await asyncio.to_thread(classifier_service.predict, request.text)
+        rag_result = await asyncio.to_thread(rag_service.get_context, request.text)
         
         # In this implementation, memory and RAG overlap in FAISS, but we pass it structured
         decision = await agent_service.process(
@@ -117,7 +117,7 @@ async def search_memory(
     service: FaissMemory = Depends(get_memory_service)
 ):
     try:
-        res = service.search_similar(query)
+        res = await asyncio.to_thread(service.search_similar, query)
         incidents = [r.get("metadata", {}) for r in res]
         return MemorySearchResponse(incidents=incidents)
     except Exception as e:
@@ -152,13 +152,13 @@ async def execute_pipeline_task(ticket_id: str):
             text = complaint.description or complaint.title
 
             # 2. AI Classification
-            classification_res = classifier.predict(text)
+            classification_res = await asyncio.to_thread(classifier.predict, text)
             labels = classification_res.get("category_pred", ["OTHER"])
             confidence = classification_res.get("confidence_score", 0.5)
             logger.info(f"[Ticket {ticket_id}] Classification complete: {labels}")
             
             # Predict Priority
-            pred_priority_str = classifier.predict_severity(text)
+            pred_priority_str = await asyncio.to_thread(classifier.predict_severity, text)
             complaint.priority = PriorityEnum[pred_priority_str]
             complaint.category = labels[0] if labels else "OTHER"
             complaint.department = RoutingEngine.get_department(complaint.category)
@@ -181,7 +181,7 @@ async def execute_pipeline_task(ticket_id: str):
             await session.commit()
 
         # 4. RAG & Agent Decision (Optional analytics)
-        rag_res = rag.get_context(text)
+        rag_res = await asyncio.to_thread(rag.get_context, text)
         similar_cases = rag_res.get("similar_cases", [])
         decision_res = await agent.process(text, context=similar_cases, ml_predictions=labels)
         
@@ -190,7 +190,7 @@ async def execute_pipeline_task(ticket_id: str):
             "decision": decision_res.get('decision'),
             "labels": labels
         }
-        memory.add_memory(text=text, metadata=metadata)
+        await asyncio.to_thread(memory.add_memory, text, metadata)
         
         logger.info(f"Successfully completed pipeline execution for ticket {ticket_id}")
         
@@ -223,9 +223,11 @@ from app.services.scheduler import start_scheduler, shutdown_scheduler
 async def lifespan(app: FastAPI):
     # Startup
     start_scheduler()
+    get_memory_service().load_memory()
     yield
     # Shutdown
     shutdown_scheduler()
+    get_memory_service().save_memory()
 
 app = FastAPI(
     title="Complaint Intelligence Dashboard API",
