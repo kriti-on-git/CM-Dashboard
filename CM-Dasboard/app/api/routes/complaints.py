@@ -229,13 +229,16 @@ async def submit_complaint(
             background_tasks=background_tasks
         )
 
-    # 6. Trigger Celery Pipeline
+    # 6. Trigger APScheduler Pipeline Natively
     try:
-        from app.tasks.pipeline import process_pipeline_task
-        process_pipeline_task.delay(ticket_id)
-        logger.info(f"Triggered Celery pipeline for complaint {ticket_id}")
+        from app.tasks.pipeline import execute_core
+        from app.main import scheduler
+        
+        # Dispatch asynchronously via APScheduler instead of Celery for native fallback
+        scheduler.add_job(execute_core, args=[ticket_id])
+        logger.info(f"Scheduled APScheduler pipeline task for complaint {ticket_id}")
     except Exception as e:
-        logger.error(f"Failed to trigger Celery pipeline for {ticket_id}: {e}", exc_info=True)
+        logger.error(f"Failed to trigger APScheduler pipeline for {ticket_id}: {e}", exc_info=True)
         
     return ComplaintSubmissionResponse(
         ticket_id=ticket_id,

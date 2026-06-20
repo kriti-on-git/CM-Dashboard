@@ -135,8 +135,13 @@ async def run_pipeline(
     background_tasks: BackgroundTasks
 ):
     try:
-        from app.tasks.pipeline import process_pipeline_task
-        process_pipeline_task.delay(request.ticket_id)
+        from app.tasks.pipeline import execute_core
+        from app.main import scheduler
+        
+        # Dispatch asynchronously via APScheduler instead of Celery for native fallback
+        scheduler.add_job(execute_core, args=[request.ticket_id])
+        logger.info(f"Scheduled APScheduler pipeline task for ticket: {request.ticket_id}")
+        
         return {"status": "accepted", "message": "Pipeline execution triggered successfully", "ticket_id": request.ticket_id}
     except Exception as e:
         logger.error(f"Failed to trigger pipeline: {str(e)}", exc_info=True)
@@ -146,13 +151,25 @@ async def run_pipeline(
 # FASTAPI APPLICATION
 # -----------------------------------------------------------------------------
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+# Global Scheduler Instance
+scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     get_memory_service().load_memory()
+    
+    # Boot APScheduler natively
+    scheduler.start()
+    logger.info("APScheduler background task runner started.")
+    
     yield
+    
     # Shutdown
+    scheduler.shutdown()
+    logger.info("APScheduler gracefully shut down.")
     get_memory_service().save_memory()
 
 app = FastAPI(
@@ -173,9 +190,8 @@ from sqlalchemy import text
 
 @app.get("/health", tags=["System"])
 async def health_check(db: AsyncSession = Depends(get_db)):
-    from fastapi import Response
-    from app.worker.celery_app import celery_app
-    import redis
+    from fastapi.responses import JSONResponse
+    from app.main import scheduler
     
     try:
         await db.execute(text("SELECT 1"))
@@ -183,33 +199,22 @@ async def health_check(db: AsyncSession = Depends(get_db)):
     except Exception:
         db_status = "disconnected"
 
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        r.ping()
-        redis_status = "connected"
-    except Exception:
-        redis_status = "disconnected"
-
-    try:
-        ping_res = celery_app.control.ping(timeout=1.0)
-        celery_worker_status = "running" if ping_res else "unreachable"
-    except Exception:
-        celery_worker_status = "error"
-
+    # APScheduler local native fallback
+    scheduler_status = "running" if scheduler.running else "stopped"
+    
     faiss_loaded = get_memory_service().index is not None and get_memory_service().index.ntotal >= 0
     
-    is_ok = db_status == "connected" and faiss_loaded and redis_status == "connected" and celery_worker_status == "running"
+    is_ok = db_status == "connected" and faiss_loaded and scheduler_status == "running"
     
     response_data = {
         "status": "ok" if is_ok else "degraded",
         "database": db_status,
-        "redis": redis_status,
-        "celery_worker": celery_worker_status,
-        "faiss_loaded": faiss_loaded
+        "scheduler": scheduler_status,
+        "faiss_loaded": faiss_loaded,
+        "fallback_mode": True
     }
     
     if not is_ok:
-        from fastapi.responses import JSONResponse
         return JSONResponse(status_code=503, content=response_data)
         
     return response_data

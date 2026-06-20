@@ -24,3 +24,13 @@ def process_pipeline_task(self, ticket_id: str):
     except Exception as exc:
         logger.error(f"Celery Task critical failure for ticket {ticket_id}: {exc}", exc_info=True)
         raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+
+async def execute_core(ticket_id: str):
+    """
+    APScheduler async task that delegates execution to the Deterministic Engine Core.
+    """
+    logger.info(f"APScheduler Task: Delegating pipeline execution to Engine Core for ticket {ticket_id}")
+    try:
+        await PipelineEngine.execute_core(ticket_id, AsyncSessionLocal)
+    except Exception as exc:
+        logger.error(f"APScheduler Task critical failure for ticket {ticket_id}: {exc}", exc_info=True)

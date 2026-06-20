@@ -5,7 +5,8 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.complaint import Complaint, ComplaintStatus, ComplaintUpdate, PriorityEnum
+from app.models.complaint import Complaint, ComplaintStatus, PriorityEnum
+from app.models.complaint_update import ComplaintUpdate
 
 logger = logging.getLogger("cm_dashboard.pipeline.engine")
 
@@ -52,7 +53,7 @@ class PipelineEngine:
             
         # Step 3: Transition State
         old_status = complaint.status
-        complaint.status = ComplaintStatus.IN_PROGRESS
+        complaint.status = ComplaintStatus.PROCESSING
         
         # Log Hook
         PipelineEngine._log_transition(ticket_id, old_status.value, complaint.status.value)
@@ -60,7 +61,7 @@ class PipelineEngine:
         # Register the ledger update
         ledger_entry = ComplaintUpdate(
             complaint_id=complaint.id,
-            status=ComplaintStatus.IN_PROGRESS.value,
+            status=ComplaintStatus.PROCESSING.value,
             note="System Core Engine initialized processing loop.",
             updated_by=None
         )
@@ -79,7 +80,7 @@ class PipelineEngine:
         result = await session.execute(query)
         complaint = result.scalars().first()
         
-        if not complaint or complaint.status != ComplaintStatus.IN_PROGRESS:
+        if not complaint or complaint.status != ComplaintStatus.PROCESSING:
             return None
             
         old_status = complaint.status
@@ -149,10 +150,10 @@ class PipelineEngine:
         The central, deterministic pipeline executor.
         It is fully isolated from APIs, idempotent, and failure-safe.
         """
-        from app.services.classification.service import get_classifier_service
-        from app.services.rag.service import get_rag_service
-        from app.services.memory.faiss_memory import get_memory_service
-        from app.services.agent.service import get_agent_service
+        from app.services.ml.inference import MLInferenceService
+        from app.services.memory.retriever import ContextRetriever
+        from app.services.memory.faiss_memory import FaissMemory
+        from app.services.agents.decision_agent import DecisionAgent
         from app.services.routing.engine import RoutingEngine
         
         async with session_factory() as session:
@@ -166,10 +167,10 @@ class PipelineEngine:
             
         try:
             # 2. Execute ML Services (Failure-Safe Boundary)
-            classifier = get_classifier_service()
-            rag = get_rag_service()
-            memory = get_memory_service()
-            agent = get_agent_service()
+            classifier = MLInferenceService()
+            rag = ContextRetriever()
+            memory = FaissMemory()
+            agent = DecisionAgent()
             
             classification_res = await asyncio.to_thread(classifier.predict, text)
             labels = classification_res.get("category_pred", ["OTHER"])
