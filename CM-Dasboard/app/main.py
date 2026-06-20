@@ -403,6 +403,47 @@ app = FastAPI(
 app.include_router(complaints_router)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# Root-level Reports Router for exact endpoint requirements
+from typing import Optional
+from app.api.deps import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
+reports_root_router = APIRouter(prefix="/reports", tags=["Reports Root"])
+
+@reports_root_router.get("/pdf")
+async def root_pdf_report(
+    type: str = "monthly",
+    month: Optional[str] = None,
+    week: Optional[str] = None,
+    department: Optional[str] = None,
+    district: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    from app.api.routes.reports import download_pdf_report
+    return await download_pdf_report(type=type, month=month, week=week, department=department, district=district, db=db)
+
+@reports_root_router.get("/csv")
+async def root_csv_export(
+    department: Optional[str] = None,
+    district: Optional[str] = None,
+    priority: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    from app.api.routes.reports import download_csv_export
+    prio_enum = None
+    if priority:
+        try:
+            from app.models.complaint import PriorityEnum
+            prio_enum = PriorityEnum(priority.upper())
+        except Exception:
+            pass
+    return await download_csv_export(department=department, district=district, priority=prio_enum, start_date=start_date, end_date=end_date, db=db)
+
+app.include_router(reports_root_router)
+
+
 from app.api.deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text

@@ -9,6 +9,7 @@ from .otp import OTP
 from .feedback import Feedback
 from .escalation import Escalation
 from .analytics_snapshot import AnalyticsSnapshot
+from .report import Report
 
 __all__ = [
     "Base",
@@ -26,4 +27,5 @@ __all__ = [
     "Feedback",
     "Escalation",
     "AnalyticsSnapshot",
+    "Report",
 ]
