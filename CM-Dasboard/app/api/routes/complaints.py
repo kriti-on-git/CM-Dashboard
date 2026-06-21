@@ -251,6 +251,18 @@ async def submit_complaint(
     except Exception as e:
         logger.error(f"Failed to trigger APScheduler pipeline for {ticket_id}: {e}", exc_info=True)
         
+    # 7. Socket.io Event (Notify Admins)
+    try:
+        from app.api.socket import sio
+        await sio.emit("newComplaint", {
+            "ticket_id": ticket_id,
+            "status": initial_status.value,
+            "category": final_category,
+            "priority": final_priority.value
+        }, room="admins")
+    except Exception as e:
+        logger.error(f"Failed to emit newComplaint via socket: {e}")
+
     return ComplaintSubmissionResponse(
         ticket_id=ticket_id,
         status=initial_status.value,

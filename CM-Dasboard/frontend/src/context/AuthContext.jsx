@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api from "../services/api";
+import { connectSocket, disconnectSocket } from "../services/socket";
 
 const AuthContext = createContext();
 
@@ -26,6 +27,7 @@ export const AuthProvider = ({ children }) => {
       if (res.data.role) {
         localStorage.setItem("role", res.data.role.toLowerCase());
       }
+      connectSocket();
     } catch (error) {
       console.error("Failed to fetch user, logging out...", error);
       logout();
@@ -40,6 +42,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("role", data.user.role.toLowerCase());
     }
     setUser(data.user);
+    connectSocket();
   };
 
   const logout = async () => {
@@ -51,6 +54,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("role");
     setUser(null);
+    disconnectSocket();
   };
 
   const role = user?.role?.toLowerCase() || localStorage.getItem("role") || null;

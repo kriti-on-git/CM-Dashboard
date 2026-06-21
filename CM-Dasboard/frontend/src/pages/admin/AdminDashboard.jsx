@@ -24,6 +24,24 @@ const itemVariants = {
 const AdminDashboard = () => {
   const { data, isLoading, isError, error, refetch } = useOfficerComplaints();
   
+  React.useEffect(() => {
+    import('../../services/socket').then(({ getSocket }) => {
+      const socket = getSocket();
+      if (!socket) return;
+
+      const handleNewComplaint = (data) => {
+        import('react-hot-toast').then(module => {
+          const toast = module.default;
+          toast.success(`New ${data.priority} priority complaint received: ${data.ticket_id}`);
+        });
+        refetch();
+      };
+
+      socket.on("newComplaint", handleNewComplaint);
+      return () => socket.off("newComplaint", handleNewComplaint);
+    });
+  }, [refetch]);
+  
   const complaints = useMemo(() => {
     if (!data) return [];
     return Array.isArray(data) ? data : data.items || [];

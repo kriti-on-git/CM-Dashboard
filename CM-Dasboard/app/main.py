@@ -554,3 +554,11 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 @app.get(f"{settings.API_V1_STR}/health", tags=["System"])
 async def api_v1_health_check(db: AsyncSession = Depends(get_db)):
     return await health_check(db=db)
+
+# -----------------------------------------------------------------------------
+# SOCKET.IO ASGI WRAPPER
+# -----------------------------------------------------------------------------
+import socketio
+from app.api.socket import sio
+
+app = socketio.ASGIApp(sio, other_asgi_app=app)

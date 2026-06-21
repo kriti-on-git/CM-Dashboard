@@ -57,6 +57,20 @@ async def update_complaint_status(
     db.add(db_update)
     await db.commit()
 
+    try:
+        query_user = select(User).filter(User.email == complaint.citizen_email)
+        user_res = await db.execute(query_user)
+        citizen_user = user_res.scalars().first()
+        
+        if citizen_user:
+            from app.api.socket import sio
+            await sio.emit("statusUpdated", {
+                "ticket_id": ticket_id,
+                "status": new_status.value
+            }, room=str(citizen_user.id))
+    except Exception as e:
+        print(f"Failed to emit statusUpdated socket event: {e}")
+
     return {"msg": "Status updated successfully", "status": new_status.value}
 
 @router.post("/complaints/{ticket_id}/proof")

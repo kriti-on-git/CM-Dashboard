@@ -6,13 +6,31 @@ import { FileText, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function CitizenDashboard() {
-  const { data: complaints = [], isLoading, isError } = useQuery({
+  const { data: complaints = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['myComplaints'],
     queryFn: async () => {
       const res = await api.get('/complaints/my-complaints');
       return res.data;
     }
   });
+
+  React.useEffect(() => {
+    import('../services/socket').then(({ getSocket }) => {
+      const socket = getSocket();
+      if (!socket) return;
+
+      const handleStatusUpdate = (data) => {
+        import('react-hot-toast').then(module => {
+          const toast = module.default;
+          toast.success(`Complaint ${data.ticket_id} status updated to ${data.status}!`);
+        });
+        refetch();
+      };
+
+      socket.on("statusUpdated", handleStatusUpdate);
+      return () => socket.off("statusUpdated", handleStatusUpdate);
+    });
+  }, [refetch]);
 
   const getStatusColor = (status) => {
     switch(status?.toLowerCase()) {
