@@ -155,10 +155,17 @@ const Home = () => {
 
               <button 
                 type="submit" 
-                className="group w-full flex items-center justify-center gap-2 py-4 mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300 active:scale-[0.98] active:translate-y-0"
+                disabled={loading}
+                className={`group w-full flex items-center justify-center gap-2 py-4 mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-300 ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0'}`}
               >
-                Submit Complaint
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                {loading ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Submit Complaint
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  </>
+                )}
               </button>
             </form>
           )}

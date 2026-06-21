@@ -1,32 +1,24 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, BarChart3, Settings, LogOut, ShieldAlert } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, FileText, Search, MessageSquare, Settings, LogOut, ShieldAlert } from 'lucide-react';
 
 const Sidebar = () => {
-  const location = useLocation();
-  const isAdmin = location.pathname.startsWith('/admin');
-  
-  const navItems = isAdmin 
-    ? [
-        { name: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true },
-        { name: 'Complaints', path: '/admin/complaints', icon: FileText, end: false },
-        { name: 'Analytics', path: '/admin/analytics', icon: BarChart3, end: false },
-      ]
-    : [
-        { name: 'Dashboard', path: '/officer/dashboard', icon: LayoutDashboard, end: true },
-        { name: 'Complaints', path: '/officer', icon: FileText, end: true },
-        { name: 'Analytics', path: '/officer/analytics', icon: BarChart3, end: false },
-      ];
+  const navItems = [
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard, end: true },
+    { name: 'Submit Complaint', path: '/submit', icon: FileText, end: false },
+    { name: 'Track Status', path: '/track', icon: Search, end: false },
+    { name: 'Feedback', path: '/feedback', icon: MessageSquare, end: false },
+  ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 flex flex-col h-full shrink-0 transition-all duration-300 shadow-xl">
+    <aside className="w-64 bg-slate-900 border-r border-slate-800 text-slate-300 flex flex-col h-full shrink-0 transition-all duration-300 shadow-xl hidden md:flex">
       <div className="h-16 flex items-center px-6 border-b border-white/5">
         <div className="flex items-center gap-3 text-white w-full group cursor-pointer">
           <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow">
             <ShieldAlert className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-[17px] tracking-tight group-hover:text-indigo-100 transition-colors">
-            {isAdmin ? 'Admin Portal' : 'Officer Portal'}
+          <span className="font-bold text-[18px] tracking-tight group-hover:text-indigo-100 transition-colors">
+            GovConnect
           </span>
         </div>
       </div>
