@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useOfficerComplaints } from '../../services/queries';
 import StatsCard from '../../components/admin/StatsCard';
@@ -7,6 +7,8 @@ import ComplaintTable from '../../components/officer/ComplaintTable';
 import Loader from '../../components/Loader';
 import AnimatedPage from '../../components/AnimatedPage';
 import { LayoutDashboard, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { getSocket } from '../../services/socket';
+import toast from 'react-hot-toast';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,22 +26,17 @@ const itemVariants = {
 const AdminDashboard = () => {
   const { data, isLoading, isError, error, refetch } = useOfficerComplaints();
   
-  React.useEffect(() => {
-    import('../../services/socket').then(({ getSocket }) => {
-      const socket = getSocket();
-      if (!socket) return;
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
 
-      const handleNewComplaint = (data) => {
-        import('react-hot-toast').then(module => {
-          const toast = module.default;
-          toast.success(`New ${data.priority} priority complaint received: ${data.ticket_id}`);
-        });
-        refetch();
-      };
+    const handleNewComplaint = (data) => {
+      toast.success(`New ${data.priority} priority complaint received: ${data.ticket_id}`);
+      refetch();
+    };
 
-      socket.on("newComplaint", handleNewComplaint);
-      return () => socket.off("newComplaint", handleNewComplaint);
-    });
+    socket.on("newComplaint", handleNewComplaint);
+    return () => socket.off("newComplaint", handleNewComplaint);
   }, [refetch]);
   
   const complaints = useMemo(() => {

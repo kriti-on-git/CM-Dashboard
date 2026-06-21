@@ -4,6 +4,7 @@ import api from '../services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User as UserIcon, ArrowRight, AlertCircle, ShieldCheck } from 'lucide-react';
 import AnimatedPage from '../components/AnimatedPage';
+import toast from 'react-hot-toast';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export default function Signup() {
     setError(null);
     try {
       await api.post('/auth/signup', form);
-      // Optional: Add a success toast here
+      toast.success('Account created successfully! Please log in.');
       navigate('/login');
     } catch (err) {
       setError(err.message || 'Signup failed. Please try again.');

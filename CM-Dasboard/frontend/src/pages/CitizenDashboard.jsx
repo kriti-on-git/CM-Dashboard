@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import AnimatedPage from '../components/AnimatedPage';
 import { FileText, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getSocket } from '../services/socket';
+import toast from 'react-hot-toast';
 
 export default function CitizenDashboard() {
   const { data: complaints = [], isLoading, isError, refetch } = useQuery({
@@ -14,22 +16,17 @@ export default function CitizenDashboard() {
     }
   });
 
-  React.useEffect(() => {
-    import('../services/socket').then(({ getSocket }) => {
-      const socket = getSocket();
-      if (!socket) return;
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
 
-      const handleStatusUpdate = (data) => {
-        import('react-hot-toast').then(module => {
-          const toast = module.default;
-          toast.success(`Complaint ${data.ticket_id} status updated to ${data.status}!`);
-        });
-        refetch();
-      };
+    const handleStatusUpdate = (data) => {
+      toast.success(`Complaint ${data.ticket_id} status updated to ${data.status}!`);
+      refetch();
+    };
 
-      socket.on("statusUpdated", handleStatusUpdate);
-      return () => socket.off("statusUpdated", handleStatusUpdate);
-    });
+    socket.on("statusUpdated", handleStatusUpdate);
+    return () => socket.off("statusUpdated", handleStatusUpdate);
   }, [refetch]);
 
   const getStatusColor = (status) => {
